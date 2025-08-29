@@ -1,4 +1,4 @@
-# XYZCode94 College Helpdesk
+# XYZCode94 College HELPDESK
 
 A full-stack web application built to help manage college applicant data and resources. It uses React + Vite for the frontend and Node.js + Express + MongoDB for the backend.
 
