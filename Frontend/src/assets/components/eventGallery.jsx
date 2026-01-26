@@ -30,7 +30,7 @@ const EventGallery = () => {
 
     setLoading(true);
     const res = await fetch(
-      `http://localhost:8000/api/v1/gallery/${eventId}?page=${page}&limit=50`
+      `${import.meta.env.VITE_BACKEND}/api/v1/gallery/${eventId}?page=${page}&limit=50`
     );
     const data = await res.json();
 
