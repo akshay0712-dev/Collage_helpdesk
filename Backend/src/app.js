@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import trackRoute from "./routes/track.route.js";
+import galleryRoutes from "./routes/gallery.routes.js"
 // import cookieParser from "cookie-parser";
 
 const app = express()
@@ -44,6 +45,7 @@ app.get("/health", (req, res) => {
 });
 
 app.use("/api/v1/track", trackRoute)
+app.use("/api/v1/gallery", galleryRoutes);
 
 
 

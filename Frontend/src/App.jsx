@@ -13,8 +13,7 @@ import Error from "./assets/components/error.jsx";
 import Devloper from "./assets/components/devloper.jsx";
 import Gallery from "./assets/components/gallery.jsx";
 import Dress from "./assets/components/dress.jsx";
-
-
+import EventGallery from "./assets/components/eventGallery.jsx";
 
 const Layout = ({ children }) => (
   <>
@@ -87,6 +86,14 @@ const App = () => {
       element: (
         <Layout>
           <Gallery />
+        </Layout>
+      ),
+    },
+    {
+      path: "/gallery/:eventId",
+      element: (
+        <Layout>
+          <EventGallery />
         </Layout>
       ),
     },
