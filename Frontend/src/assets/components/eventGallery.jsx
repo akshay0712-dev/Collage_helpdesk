@@ -1,7 +1,10 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useLocation } from "react-router-dom";
 
-const SWIPE_THRESHOLD = 80;
+/* ================== MOTION CONSTANTS ================== */
+const SWIPE_DISTANCE = 120;
+const MAX_DRAG = 320;
+const EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
 
 const EventGallery = () => {
   const { eventId } = useParams();
@@ -13,15 +16,15 @@ const EventGallery = () => {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
+
   const [selectedIndex, setSelectedIndex] = useState(null);
 
-  /* swipe animation state */
-  const [offsetX, setOffsetX] = useState(0);
+  /* ---------- Swipe animation state ---------- */
+  const [dragX, setDragX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const startX = useRef(0);
 
-  const touchStartX = useRef(0);
-
-  /* ---------- Masonry helpers ---------- */
+  /* ================== MASONRY ================== */
   const getColumnCount = () => {
     if (window.innerWidth >= 768) return 5;
     if (window.innerWidth >= 640) return 2;
@@ -34,7 +37,7 @@ const EventGallery = () => {
     return cols;
   };
 
-  /* ---------- Fetch gallery ---------- */
+  /* ================== FETCH ================== */
   const fetchGallery = async () => {
     if (loading || !hasMore) return;
 
@@ -52,8 +55,6 @@ const EventGallery = () => {
         setHasMore(data.hasMore);
         setPage((p) => p + 1);
       }
-    } catch (err) {
-      console.error("Gallery fetch failed", err);
     } finally {
       setLoading(false);
     }
@@ -63,7 +64,7 @@ const EventGallery = () => {
     fetchGallery();
   }, []);
 
-  /* ---------- Infinite scroll ---------- */
+  /* ================== INFINITE SCROLL ================== */
   useEffect(() => {
     const onScroll = () => {
       if (
@@ -77,7 +78,7 @@ const EventGallery = () => {
     return () => window.removeEventListener("scroll", onScroll);
   }, [photos, hasMore, loading]);
 
-  /* ---------- Navigation ---------- */
+  /* ================== NAVIGATION ================== */
   const goNext = () => {
     if (selectedIndex < photos.length - 1) {
       setSelectedIndex((i) => i + 1);
@@ -90,7 +91,7 @@ const EventGallery = () => {
     }
   };
 
-  /* ---------- Preload next & prev ---------- */
+  /* ================== PRELOAD ================== */
   useEffect(() => {
     if (selectedIndex === null) return;
 
@@ -105,49 +106,70 @@ const EventGallery = () => {
     preload(selectedIndex - 1);
   }, [selectedIndex, photos]);
 
-  /* ---------- Keyboard ---------- */
+  /* ================== KEYBOARD ================== */
   useEffect(() => {
     if (selectedIndex === null) return;
 
-    const handleKey = (e) => {
+    const onKey = (e) => {
       if (e.key === "ArrowRight") goNext();
       if (e.key === "ArrowLeft") goPrev();
       if (e.key === "Escape") setSelectedIndex(null);
     };
 
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [selectedIndex, photos]);
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [selectedIndex]);
 
-  /* ---------- Swipe handlers ---------- */
+  /* ================== SWIPE ================== */
   const onTouchStart = (e) => {
-    touchStartX.current = e.touches[0].clientX;
+    startX.current = e.touches[0].clientX;
     setIsDragging(true);
   };
 
   const onTouchMove = (e) => {
-    const currentX = e.touches[0].clientX;
-    setOffsetX(currentX - touchStartX.current);
+    let delta = e.touches[0].clientX - startX.current;
+
+    /* resistance at edges */
+    if (
+      (selectedIndex === 0 && delta > 0) ||
+      (selectedIndex === photos.length - 1 && delta < 0)
+    ) {
+      delta *= 0.35;
+    }
+
+    delta = Math.max(-MAX_DRAG, Math.min(MAX_DRAG, delta));
+    setDragX(delta);
   };
 
   const onTouchEnd = () => {
     setIsDragging(false);
 
-    if (offsetX < -SWIPE_THRESHOLD) goNext();
-    else if (offsetX > SWIPE_THRESHOLD) goPrev();
-
-    setOffsetX(0);
+    if (dragX < -SWIPE_DISTANCE) {
+      slideTo(-window.innerWidth, goNext);
+    } else if (dragX > SWIPE_DISTANCE) {
+      slideTo(window.innerWidth, goPrev);
+    } else {
+      setDragX(0);
+    }
   };
 
-  /* ---------- Render ---------- */
+  const slideTo = (value, callback) => {
+    setDragX(value);
+    setTimeout(() => {
+      callback();
+      setDragX(0);
+    }, 260);
+  };
+
+  /* ================== RENDER ================== */
   return (
     <div className="!mt-10 w-[80vw] !mx-auto">
       <h2 className="text-2xl font-semibold !mb-6">📸 {heading}</h2>
 
-      {/* Masonry */}
+      {/* MASONRY */}
       <div className="flex gap-4">
-        {columns.map((col, colIndex) => (
-          <div key={colIndex} className="flex-1 flex flex-col gap-4">
+        {columns.map((col, ci) => (
+          <div key={ci} className="flex-1 flex flex-col gap-4">
             {col.map((photo) => (
               <img
                 key={photo.id}
@@ -166,44 +188,67 @@ const EventGallery = () => {
         ))}
       </div>
 
-      {/* ---------- Lightbox ---------- */}
+      {/* LIGHTBOX */}
       {selectedIndex !== null && (
         <div
-          className="fixed inset-0 bg-black/90 flex items-center justify-center z-[9999]"
+          className="fixed inset-0 bg-black/95 z-[9999] overflow-hidden flex items-center justify-center"
           onClick={() => setSelectedIndex(null)}
         >
-          {/* LEFT */}
+          <div
+            className="relative w-full h-full flex items-center justify-center"
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              transform: `translateX(${dragX}px)`,
+              transition: isDragging ? "none" : `transform 0.26s ${EASE}`,
+            }}
+          >
+            {/* PREVIOUS */}
+            {photos[selectedIndex - 1] && (
+              <img
+                src={photos[selectedIndex - 1].full}
+                className="absolute left-[-100%] max-h-[90vh] opacity-60 scale-95"
+              />
+            )}
+
+            {/* CURRENT */}
+            <img
+              src={photos[selectedIndex].full}
+              className="max-h-[90vh] rounded-lg shadow-2xl"
+              style={{
+                transform: `scale(${isDragging ? 0.97 : 1})`,
+                transition: "transform 0.25s ease",
+              }}
+            />
+
+            {/* NEXT */}
+            {photos[selectedIndex + 1] && (
+              <img
+                src={photos[selectedIndex + 1].full}
+                className="absolute right-[-100%] max-h-[90vh] opacity-60 scale-95"
+              />
+            )}
+          </div>
+
+          {/* BUTTONS */}
           <button
             onClick={(e) => {
               e.stopPropagation();
               goPrev();
             }}
-            className="absolute left-6 text-white text-5xl font-bold opacity-80 hover:opacity-100"
+            className="absolute left-6 text-white text-5xl opacity-70 hover:opacity-100"
           >
             ‹
           </button>
 
-          {/* IMAGE WITH SWIPE ANIMATION */}
-          <img
-            src={photos[selectedIndex].full}
-            onClick={(e) => e.stopPropagation()}
-            onTouchStart={onTouchStart}
-            onTouchMove={onTouchMove}
-            onTouchEnd={onTouchEnd}
-            className="max-w-full max-h-[90vh] rounded-lg shadow-lg select-none"
-            style={{
-              transform: `translateX(${offsetX}px)`,
-              transition: isDragging ? "none" : "transform 0.25s ease",
-            }}
-          />
-
-          {/* RIGHT */}
           <button
             onClick={(e) => {
               e.stopPropagation();
               goNext();
             }}
-            className="absolute right-6 text-white text-5xl font-bold opacity-80 hover:opacity-100"
+            className="absolute right-6 text-white text-5xl opacity-70 hover:opacity-100"
           >
             ›
           </button>
