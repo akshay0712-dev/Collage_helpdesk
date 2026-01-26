@@ -29,19 +29,24 @@ const EventGallery = () => {
     if (loading || !hasMore) return;
 
     setLoading(true);
-    const res = await fetch(
-      `${import.meta.env.VITE_BACKEND}/api/v1/gallery/${eventId}?page=${page}&limit=50`
-    );
-    const data = await res.json();
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_BACKEND}/api/v1/gallery/${eventId}?page=${page}&limit=50`
+      );
+      const data = await res.json();
 
-    if (data.success) {
-      const updated = [...photos, ...data.images];
-      setPhotos(updated);
-      setColumns(distributeImages(updated, getColumnCount()));
-      setHasMore(data.hasMore);
-      setPage((p) => p + 1);
+      if (data.success) {
+        const updated = [...photos, ...data.images];
+        setPhotos(updated);
+        setColumns(distributeImages(updated, getColumnCount()));
+        setHasMore(data.hasMore);
+        setPage((p) => p + 1);
+      }
+    } catch (err) {
+      console.error("Gallery fetch failed", err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -65,16 +70,18 @@ const EventGallery = () => {
     <div className="!mt-10 w-[80vw] !mx-auto">
       <h2 className="text-2xl font-semibold !mb-6">📸 {heading}</h2>
 
+      {/* Pinterest-style masonry */}
       <div className="flex gap-4">
         {columns.map((col, i) => (
           <div key={i} className="flex-1 flex flex-col gap-4">
             {col.map((photo) => (
               <img
                 key={photo.id}
-                src={photo.url}
+                src={photo.thumbnail || photo.full}
                 alt={photo.name}
-                className="rounded-lg shadow cursor-pointer hover:opacity-80"
-                onClick={() => setSelectedPhoto(photo.url)}
+                loading="lazy"
+                className="rounded-lg shadow cursor-pointer hover:opacity-80 transition"
+                onClick={() => setSelectedPhoto(photo.full)}
               />
             ))}
           </div>
@@ -82,11 +89,12 @@ const EventGallery = () => {
       </div>
 
       {loading && (
-        <p className="text-center text-gray-500 py-4">
+        <p className="text-center text-gray-500 !py-4">
           Loading more photos…
         </p>
       )}
 
+      {/* Lightbox */}
       {selectedPhoto && (
         <div
           className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
@@ -94,7 +102,7 @@ const EventGallery = () => {
         >
           <img
             src={selectedPhoto}
-            className="max-w-full max-h-[90vh] rounded-lg"
+            className="max-w-full max-h-[90vh] rounded-lg shadow-lg"
           />
         </div>
       )}

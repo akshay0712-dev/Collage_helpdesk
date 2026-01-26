@@ -22,7 +22,8 @@ const getAllImagesFromFolder = async (folderId, folderName) => {
   do {
     const res = await drive.files.list({
       q: `'${folderId}' in parents and mimeType contains 'image/'`,
-      fields: "nextPageToken, files(id, name)",
+      fields:
+        "nextPageToken, files(id, name, thumbnailLink)",
       pageSize: 100,
       pageToken,
     });
@@ -32,7 +33,10 @@ const getAllImagesFromFolder = async (folderId, folderName) => {
         id: file.id,
         name: file.name,
         folderName,
-        url: `https://lh3.googleusercontent.com/d/${file.id}`,
+        thumbnail: file.thumbnailLink
+          ? file.thumbnailLink.replace("=s220", "=s400")
+          : null,
+        full: `https://lh3.googleusercontent.com/d/${file.id}`,
       }))
     );
 
@@ -45,19 +49,19 @@ const getAllImagesFromFolder = async (folderId, folderName) => {
 /**
  * Get ALL images from:
  * - parent folder
- * - ALL its subfolders
+ * - ALL subfolders
  */
 export const getImagesFromParentFolder = async (parentFolderId) => {
   let allImages = [];
 
-  // 1️⃣ Fetch images directly inside parent folder
+  // 1️⃣ Images directly inside parent
   const parentImages = await getAllImagesFromFolder(
     parentFolderId,
     "parent"
   );
   allImages.push(...parentImages);
 
-  // 2️⃣ Fetch ALL subfolders inside parent (pagination-safe)
+  // 2️⃣ Get subfolders
   let subFolders = [];
   let pageToken = null;
 
@@ -73,7 +77,7 @@ export const getImagesFromParentFolder = async (parentFolderId) => {
     pageToken = res.data.nextPageToken;
   } while (pageToken);
 
-  // 3️⃣ Fetch images from ALL subfolders (parallel)
+  // 3️⃣ Images from subfolders
   const subFolderImages = await Promise.all(
     subFolders.map((folder) =>
       getAllImagesFromFolder(folder.id, folder.name)

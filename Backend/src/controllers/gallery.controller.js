@@ -1,7 +1,7 @@
 import { getImagesFromParentFolder } from "../utils/googleDrive.js";
 
 // cache PER EVENT
-const cachedImages = {};
+const cache = {};
 
 const EVENT_FOLDER_MAP = {
   sportsFest2K25: "1qYuXP2IaGSyjLExK5R47Ei-QGmDp0NXP",
@@ -15,7 +15,6 @@ export const getEventGallery = async (req, res) => {
     const limit = parseInt(req.query.limit) || 50;
 
     const folderId = EVENT_FOLDER_MAP[eventId];
-
     if (!folderId) {
       return res.status(404).json({
         success: false,
@@ -23,31 +22,27 @@ export const getEventGallery = async (req, res) => {
       });
     }
 
-    // fetch once per event
-    if (!cachedImages[eventId]) {
-      console.log(`Fetching images for event: ${eventId} ${folderId}`);
-      cachedImages[eventId] = await getImagesFromParentFolder(folderId);
+    if (!cache[eventId]) {
+      console.log("Fetching from Google Drive:", eventId);
+      cache[eventId] = await getImagesFromParentFolder(folderId);
     }
-
-    const images = cachedImages[eventId];
 
     const start = (page - 1) * limit;
     const end = start + limit;
 
-    res.status(200).json({
+    res.json({
       success: true,
-      eventId,
       page,
       limit,
-      total: images.length,
-      hasMore: end < images.length,
-      images: images.slice(start, end),
+      total: cache[eventId].length,
+      hasMore: end < cache[eventId].length,
+      images: cache[eventId].slice(start, end),
     });
-  } catch (error) {
-    console.error("Gallery Error:", error);
+  } catch (err) {
+    console.error("Gallery Error:", err);
     res.status(500).json({
       success: false,
-      message: "Failed to fetch gallery images",
+      message: "Gallery fetch failed",
     });
   }
 };
