@@ -1,7 +1,9 @@
 import { google } from "googleapis";
 
 const auth = new google.auth.GoogleAuth({
-  keyFile: JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON),
+  keyFile: process.env.GOOGLE_CREDENTIALS_PATH
+    ? process.env.GOOGLE_CREDENTIALS_PATH
+    : "/etc/secrets/google-credentials.json",
   scopes: ["https://www.googleapis.com/auth/drive.readonly"],
 });
 
