@@ -1,11 +1,18 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useLocation } from "react-router-dom";
 
+const SkeletonCard = ({ height }) => (
+  <div
+    className="w-full rounded-lg bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200
+               animate-pulse"
+    style={{ height }}
+  />
+);
+
 /* ================== CONSTANTS ================== */
 const SWIPE_DISTANCE = 120;
 const DURATION = 420;
 const EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
-
 
 const EventGallery = () => {
   const { eventId } = useParams();
@@ -21,6 +28,25 @@ const EventGallery = () => {
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [direction, setDirection] = useState(0); // -1 prev | +1 next
   const isAnimating = useRef(false);
+
+  const SkeletonMasonry = ({ columns = 5 }) => {
+    const heights = [180, 260, 220, 300, 200, 240];
+
+    return (
+      <div className="flex gap-4">
+        {Array.from({ length: columns }).map((_, col) => (
+          <div key={col} className="flex-1 flex flex-col gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <SkeletonCard
+                key={i}
+                height={heights[(i + col) % heights.length]}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   /* infinite scroll sentinel */
   const loadMoreRef = useRef(null);
@@ -49,7 +75,7 @@ const EventGallery = () => {
     setLoading(true);
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_BACKEND}/api/v1/gallery/${eventId}?page=${page}&limit=50`
+        `${import.meta.env.VITE_BACKEND}/api/v1/gallery/${eventId}?page=${page}&limit=50`,
       );
       const data = await res.json();
 
@@ -80,7 +106,7 @@ const EventGallery = () => {
       ([entry]) => {
         if (entry.isIntersecting) fetchGallery();
       },
-      { rootMargin: "300px" }
+      { rootMargin: "300px" },
     );
 
     observer.observe(loadMoreRef.current);
@@ -89,12 +115,7 @@ const EventGallery = () => {
 
   /* ================== NAVIGATION ================== */
   const changeIndex = (next, dir) => {
-    if (
-      next < 0 ||
-      next >= photos.length ||
-      isAnimating.current
-    )
-      return;
+    if (next < 0 || next >= photos.length || isAnimating.current) return;
 
     isAnimating.current = true;
     setDirection(dir);
@@ -157,31 +178,34 @@ const EventGallery = () => {
       <h2 className="text-2xl font-semibold !mb-6">📸 {heading}</h2>
 
       {/* MASONRY GRID */}
-      <div className="flex gap-4">
-        {columns.map((col, ci) => (
-          <div key={ci} className="flex-1 flex flex-col gap-4">
-            {col.map((photo) => (
-              <img
-                key={photo.id}
-                src={photo.thumbnail || photo.full}
-                className="rounded-lg shadow cursor-pointer hover:opacity-80"
-                onClick={() =>
-                  setSelectedIndex(
-                    photos.findIndex((p) => p.id === photo.id)
-                  )
-                }
-              />
-            ))}
-          </div>
-        ))}
-      </div>
+      {/* MASONRY GRID */}
+      {photos.length === 0 && loading ? (
+        <SkeletonMasonry columns={getColumnCount()} />
+      ) : (
+        <div className="flex gap-4">
+          {columns.map((col, ci) => (
+            <div key={ci} className="flex-1 flex flex-col gap-4">
+              {col.map((photo) => (
+                <img
+                  key={photo.id}
+                  src={photo.thumbnail || photo.full}
+                  className="rounded-lg shadow cursor-pointer hover:opacity-80 transition"
+                  onClick={() =>
+                    setSelectedIndex(photos.findIndex((p) => p.id === photo.id))
+                  }
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* LOAD MORE */}
       <div ref={loadMoreRef} className="!h-20" />
-      {loading && (
-        <p className="text-center text-gray-500 !py-4">
-          Loading more photos…
-        </p>
+      {loading && photos.length > 0 && (
+        <div className="mt-6">
+          <SkeletonMasonry columns={getColumnCount()} />
+        </div>
       )}
 
       {/* ================== LIGHTBOX ================== */}
